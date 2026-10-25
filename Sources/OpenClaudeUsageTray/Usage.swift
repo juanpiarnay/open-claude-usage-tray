@@ -35,7 +35,7 @@ enum UsageError: LocalizedError {
         switch self {
         case .noCredentials: return "Claude Code credentials not found. Install Claude Code and log in."
         case .tokenExpired: return "Claude Code login expired — run `claude` in Terminal and use /login."
-        case .rateLimited(let seconds): return "Rate limited — retrying in \(countdown(to: Date().addingTimeInterval(seconds)))."
+        case .rateLimited: return "Rate limited."
         case .http(let code): return "Usage API returned HTTP \(code)."
         }
     }

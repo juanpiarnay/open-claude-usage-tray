@@ -8,10 +8,15 @@ struct UsagePopover: View {
             // Re-render every minute so countdowns tick between fetches.
             TimelineView(.periodic(from: .now, by: 60)) { context in
                 VStack(alignment: .leading, spacing: 12) {
-                    if store.limits.isEmpty && store.error == nil {
+                    let blocked = store.blockedUntil > context.date
+                    if store.limits.isEmpty && store.error == nil && !blocked {
                         Text("Loading…").foregroundStyle(.secondary)
                     }
                     ForEach(store.limits) { LimitRow(limit: $0, now: context.date) }
+                    if blocked {
+                        Text("Rate limited — retrying in \(countdown(to: store.blockedUntil, from: context.date))")
+                            .font(.caption).foregroundStyle(.red)
+                    }
                 }
             }
 

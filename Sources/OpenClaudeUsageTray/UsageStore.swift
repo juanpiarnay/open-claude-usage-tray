@@ -7,8 +7,13 @@ final class UsageStore: ObservableObject {
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var isLoading = false
 
+    /// End of the current 429 backoff. Persisted so quitting and reopening can't hit the API
+    /// early, since retrying before Retry-After extends the rate limit.
+    @Published private(set) var blockedUntil = UserDefaults.standard.object(forKey: "blockedUntil") as? Date ?? .distantPast {
+        didSet { UserDefaults.standard.set(blockedUntil, forKey: "blockedUntil") }
+    }
+
     private var pollTask: Task<Void, Never>?
-    private var blockedUntil = Date.distantPast
 
     /// Polls every 5 min, or after the server's Retry-After on a 429. Task.sleep uses the
     /// continuous clock, so a poll that came due while the Mac slept runs right after wake.
@@ -33,9 +38,11 @@ final class UsageStore: ObservableObject {
             error = nil
         } catch {
             if case UsageError.rateLimited(let seconds) = error {
-                blockedUntil = Date().addingTimeInterval(seconds)
+                blockedUntil = Date().addingTimeInterval(seconds) // popover shows a live countdown
+                self.error = nil
+            } else {
+                self.error = error.localizedDescription
             }
-            self.error = error.localizedDescription
         }
     }
 }
