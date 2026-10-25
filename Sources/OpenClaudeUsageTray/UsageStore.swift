@@ -8,35 +8,34 @@ final class UsageStore: ObservableObject {
     @Published private(set) var isLoading = false
 
     private var pollTask: Task<Void, Never>?
+    private var blockedUntil = Date.distantPast
 
-    /// Polls every 5 min (15 min after a 429). Task.sleep uses the continuous clock,
-    /// so a poll that came due while the Mac slept runs right after wake.
+    /// Polls every 5 min, or after the server's Retry-After on a 429. Task.sleep uses the
+    /// continuous clock, so a poll that came due while the Mac slept runs right after wake.
     func start() {
         pollTask = Task {
             while !Task.isCancelled {
-                let rateLimited = await refresh()
-                try? await Task.sleep(for: .seconds(rateLimited ? 15 * 60 : 5 * 60))
+                await refresh()
+                let wait = max(5 * 60, blockedUntil.timeIntervalSinceNow)
+                try? await Task.sleep(for: .seconds(wait))
             }
         }
     }
 
-    /// Returns true when the API rate-limited us.
-    @discardableResult
-    func refresh() async -> Bool {
-        guard !isLoading else { return false }
+    func refresh() async {
+        // A manual Refresh during a rate limit would only extend it.
+        guard !isLoading, Date() >= blockedUntil else { return }
         isLoading = true
         defer { isLoading = false }
         do {
             limits = try await fetchLimits()
             lastUpdated = Date()
             error = nil
-            return false
-        } catch UsageError.rateLimited {
-            error = UsageError.rateLimited.localizedDescription
-            return true
         } catch {
+            if case UsageError.rateLimited(let seconds) = error {
+                blockedUntil = Date().addingTimeInterval(seconds)
+            }
             self.error = error.localizedDescription
-            return false
         }
     }
 }

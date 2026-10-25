@@ -32,7 +32,7 @@ Tests need full Xcode: `swift test`.
 2. Calls `GET https://api.anthropic.com/api/oauth/usage` every 5 minutes (15 after a rate limit).
 3. Draws each entry of the response's `limits` array, using its `severity` for the color.
 
-The token is re-read on every poll, so it stays valid as long as Claude Code keeps refreshing it. If it expires, open Claude Code once.
+The token is re-read on every poll, so it stays valid as long as Claude Code keeps refreshing it. If it expires (e.g. after days without using Claude Code), run `claude` and `/login` again.
 
 > The usage endpoint is undocumented and may change or disappear at any time.
 

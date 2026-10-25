@@ -28,13 +28,14 @@ struct Limit: Identifiable, Equatable {
 }
 
 enum UsageError: LocalizedError {
-    case noCredentials, tokenExpired, rateLimited, http(Int)
+    case noCredentials, tokenExpired, http(Int)
+    case rateLimited(retryAfter: TimeInterval)
 
     var errorDescription: String? {
         switch self {
         case .noCredentials: return "Claude Code credentials not found. Install Claude Code and log in."
-        case .tokenExpired: return "Token expired — open Claude Code to refresh it."
-        case .rateLimited: return "Rate limited — retrying in 15 min."
+        case .tokenExpired: return "Claude Code login expired — run `claude` in Terminal and use /login."
+        case .rateLimited(let seconds): return "Rate limited — retrying in \(countdown(to: Date().addingTimeInterval(seconds)))."
         case .http(let code): return "Usage API returned HTTP \(code)."
         }
     }
@@ -122,10 +123,14 @@ func fetchLimits() async throws -> [Limit] {
     request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
 
     let (data, response) = try await URLSession.shared.data(for: request)
-    switch (response as? HTTPURLResponse)?.statusCode ?? 0 {
+    let http = response as? HTTPURLResponse
+    switch http?.statusCode ?? 0 {
     case 200: return try parseLimits(data)
     case 401: throw UsageError.tokenExpired
-    case 429: throw UsageError.rateLimited
+    case 429:
+        // Retrying before Retry-After seems to restart the penalty, so wait it out fully (plus a margin).
+        let retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init) ?? 15 * 60
+        throw UsageError.rateLimited(retryAfter: max(retryAfter, 5 * 60) + 60)
     case let code: throw UsageError.http(code)
     }
 }
