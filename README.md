@@ -29,7 +29,7 @@ Tests need full Xcode: `swift test`.
 ## How it works
 
 1. Reads Claude Code's OAuth token with `/usr/bin/security find-generic-password -s "Claude Code-credentials" -w`. Claude Code writes that Keychain item with the same tool, so reading it never prompts for a password.
-2. Calls `GET https://api.anthropic.com/api/oauth/usage` every 5 minutes (15 after a rate limit).
+2. Calls `GET https://api.anthropic.com/api/oauth/usage` every 5 minutes; after a rate limit it waits for the server's `Retry-After`.
 3. Draws each entry of the response's `limits` array, using its `severity` for the color.
 
 The token is re-read on every poll, so it stays valid as long as Claude Code keeps refreshing it. If it expires (e.g. after days without using Claude Code), run `claude` and `/login` again.
